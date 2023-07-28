@@ -8,6 +8,6 @@
 
 ```console
 mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX=../install ../avito
+cmake -DCMAKE_INSTALL_PREFIX=../install ../freq_dict
 cmake --build . --target install
 ```
