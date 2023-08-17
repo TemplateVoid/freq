@@ -6,7 +6,7 @@
 ```console
 git clone https://github.com/TemplateVoid/freq.git
 mkdir build && cd build
-cmake -DCMAKE_PREFIX_PATH=../install ../freq
+cmake -DCMAKE_INSTALL_PREFIX=../install ../freq
 cmake --build . --target install
 ```
 
