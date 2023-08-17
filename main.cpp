@@ -1,12 +1,8 @@
 #include <iostream>
 #include <unordered_map>
-#include <memory>
 #include <string>
 #include <stdexcept>
 #include <fstream>
-#include <algorithm>
-#include <random>
-#include <chrono>
 
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -15,42 +11,11 @@
 
 #include <cctype>
 
-static constexpr size_t AlphabetSize = 26;
+namespace freq {
+namespace detail {
 
-// naive trie implementation
-struct TrieNode
-{
-    TrieNode() {
-        std::fill_n(children, AlphabetSize, nullptr);
-    }
-
-    ~TrieNode() noexcept {
-        for (auto child: children)
-            delete child;
-    }
-
-    void insert(const std::string &key)
-    {
-        TrieNode *node = this;
-        for (auto ch: key) {
-            const int index = ch - 'a';
-            if (node->children[index] == nullptr)
-                node->children[index] = new TrieNode;
-
-            node = node->children[index];
-        }
-        node->isWord = true;
-        ++count;
-    }
-
-private:
-    TrieNode *children[AlphabetSize];
-    size_t count = 0;
-    bool isWord = false;
-
-};
-
-std::unordered_map<std::string, size_t> frequencyDictMmap(const char *filename)
+// Read file and add words to unordered_map (use mmap)
+std::unordered_map<std::string, size_t> frequencyDict(const char *filename)
 {
     // open file
     int fd = ::open(filename, O_RDONLY);
@@ -104,103 +69,44 @@ std::unordered_map<std::string, size_t> frequencyDictMmap(const char *filename)
     return dict;
 
 }
+}
 
-std::unordered_map<std::string, size_t> frequencyDictStream(const char *filename)
+void freq(const char *input, const char *output)
 {
-    std::unordered_map<std::string, size_t> dict;
-    std::ifstream file(filename);
-    // just read word by word
-    for (std::string word; file >> word;) {
-        std::transform(word.cbegin(), word.cend(), word.begin(), ::tolower);
-        ++dict[word];
+    const auto dict = detail::frequencyDict(input);
+
+    std::vector<decltype(dict.begin())> iterators;
+    iterators.reserve(dict.size());
+    for (auto it = dict.begin(); it != dict.end(); ++it) {
+        iterators.push_back(it);
     }
-    return dict;
+    // sort
+    std::sort(iterators.begin(), iterators.end(), [](auto it1, auto it2) {
+        return it1->second == it2->second ? it1->first < it2->first : it1->second > it2->second;
+    });
+
+    // write to output file
+    std::ofstream file(output);
+    for (auto it: iterators) {
+        file << it->first << " " << it->second << "\n";
+    }
 }
 
-std::unique_ptr<TrieNode> frequencyDictStreamTrie(const char *filename)
+}
+
+int main(int argc, char **argv)
 {
-    auto dict = std::make_unique<TrieNode>();
-    std::ifstream file(filename);
-    for (std::string word; file >> word;) {
-        std::transform(word.cbegin(), word.cend(), word.begin(), ::tolower);
-        dict->insert(word);
-    }
-    return dict;
-}
-
-
-namespace test {
-
-struct Timer {
-    Timer(const std::string &name): point(std::chrono::steady_clock::now()), name(name) {}
-    ~Timer() {
-        const std::chrono::duration<double> seconds = std::chrono::steady_clock::now() - point;
-        std::cout << name << " " << seconds.count() << "\n";
+    if (argc != 3) {
+        std::cout << "Wrong number of input parameters!\n" << "Usage: ./freq <input> <output>\n";
+        return -1;
     }
 
-private:
-    std::chrono::time_point<std::chrono::steady_clock> point;
-    std::string name;
-};
-
-void generateTextFile(const std::string &filename, size_t size, size_t minWordSize = 5, size_t maxWordSize = 5) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-
-    std::uniform_int_distribution<> distribLetter(0, 25);
-    std::uniform_int_distribution<> distribWordSize(minWordSize, maxWordSize);
-
-    std::string text;
-    text.reserve(size);
-
-    while (size > 0) {
-        size_t wordSize = distribWordSize(gen);
-        if (wordSize > size) {
-            wordSize = size;
-        }
-        size -= wordSize;
-        for (; wordSize > 0; --wordSize) {
-            text.push_back(distribLetter(gen) % 2 == 0 ? distribLetter(gen) + 65 : distribLetter(gen) + 97);
-        }
-        if (size > 0) {
-            text.push_back(' ');
-            --size;
-        }
+    try {
+        freq::freq(argv[1], argv[2]);
     }
-
-    std::ofstream file(filename.c_str());
-    file << text;
-}
-
-void benchmark(size_t filesize, size_t minWordSize, size_t maxWordSize) {
-
-    std::cout << "Benchmark: " << filesize << ", " << minWordSize << ", " << maxWordSize << "\n";
-
-    generateTextFile("test.txt", filesize, minWordSize, maxWordSize);
-
-    {
-        Timer timer("Mmap read");
-        auto dict = frequencyDictMmap("test.txt");
+    catch (std::exception &ex) {
+        std::cerr << ex.what();
+        return -1;
     }
-
-    {
-        Timer timer("Stream read");
-        auto dict = frequencyDictStream("test.txt");
-    }
-
-    {
-        Timer timer("Stream read trie");
-        auto dict = frequencyDictStreamTrie("test.txt");
-    }
-}
-
-}
-
-int main()
-{
-    test::benchmark(1024 * 1024, 1, 10);
-    test::benchmark(1024 * 1024, 5, 5);
-    test::benchmark(10 * 1024 * 1024, 3, 10);
-    test::benchmark(100 * 1024 * 1024, 5, 10);
     return 0;
 }
