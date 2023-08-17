@@ -1,13 +1,15 @@
-# Считаем количество слов в тексте
+# Считаем количество слов в тексте и выводим в файл
 
-- `frequencyDictMmap` - используем filemapping для чтения файла и std::unordered_map
-- `frequencyDictStream` - используем fstream из stl и std::unordered_map
-- `frequencyDictStreamTrie` - используем fstream и наивную реализацию префиксного дерева
+Запуск программы: 
+```console
+./freq <input> <output>
+```
 
 # Сборка примера
 
 ```console
+git clone https://github.com/TemplateVoid/freq.git
 mkdir build && cd build
-cmake -DCMAKE_PREFIX_PATH=../install ../avito
+cmake -DCMAKE_PREFIX_PATH=../install ../freq
 cmake --build . --target install
 ```
